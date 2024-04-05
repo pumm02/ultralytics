@@ -8,7 +8,7 @@ from ultralytics.utils.plotting import Annotator, colors
 
 check_requirements("shapely>=2.0.0")
 
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, Point, Polygon, LinearRing
 
 
 class ObjectCounter:
@@ -37,7 +37,7 @@ class ObjectCounter:
 
         self.names = None  # Classes names
         self.annotator = None  # Annotator
-        self.window_name = "Ultralytics YOLOv8 Object Counter"
+        self.window_name = "Object Counter"
 
         # Object counting Information
         self.in_counts = 0
@@ -221,14 +221,15 @@ class ObjectCounter:
                         if distance < self.line_dist_thresh and track_id not in self.count_ids:
                             self.count_ids.append(track_id)
 
-                            if (box[0] - prev_position[0]) * (self.counting_region.centroid.x - prev_position[0]) > 0:
+                            linear_ring = LinearRing([self.reg_pts[0], self.reg_pts[1], prev_position])
+                            if linear_ring.is_ccw:
                                 self.in_counts += 1
                                 self.class_wise_count[self.names[cls]]["in"] += 2
                             else:
                                 self.out_counts += 1
                                 self.class_wise_count[self.names[cls]]["out"] += 1
 
-        label = "Ultralytics Analytics \t"
+        label = "Result \t"
 
         for key, value in self.class_wise_count.items():
             if value["in"] != 0 or value["out"] != 0:
@@ -250,6 +251,19 @@ class ObjectCounter:
                 count_txt_color=self.count_txt_color,
                 count_bg_color=self.count_bg_color,
             )
+
+    def check_intersection(self,points1, points2):
+        '''
+        check if two lines has intersect and return point of intersection. if not, will return empty point
+        :param : endpoints of a line
+        :param endpoints of another line:
+        :return: flag that indicates whether line1 has crossed line2, point of intersection or empty point
+        '''
+        if len(points1) == 1:
+            points1.append(points1[0])
+        line1 = LineString(points1)
+        line2 = LineString(points2)
+        return line1.crosses(line2), line1.intersection(line2)
 
     def display_frames(self):
         """Display frame."""
