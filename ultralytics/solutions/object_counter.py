@@ -59,6 +59,8 @@ class ObjectCounter:
 
         # Check if environment support imshow
         self.env_check = check_imshow(warn=True)
+        
+        self.last_track_count = None
 
     def set_args(
         self,
@@ -169,6 +171,8 @@ class ObjectCounter:
         # Draw region or line
         self.annotator.draw_region(reg_pts=self.reg_pts, color=self.region_color, thickness=self.region_thickness)
 
+        self.last_track_count = dict()
+
         if tracks[0].boxes.id is not None:
             boxes = tracks[0].boxes.xyxy.cpu()
             clss = tracks[0].boxes.cls.cpu().tolist()
@@ -211,24 +215,32 @@ class ObjectCounter:
                         if (box[0] - prev_position[0]) * (self.counting_region.centroid.x - prev_position[0]) > 0:
                             self.in_counts += 1
                             self.class_wise_count[self.names[cls]]["in"] += 1
+                            self.last_track_count[track_id] = 'in'
                         else:
                             self.out_counts += 1
                             self.class_wise_count[self.names[cls]]["out"] += 1
+                            self.last_track_count[track_id] = 'out'
 
                 # Count objects using line
                 elif len(self.reg_pts) == 2:
-                    if prev_position is not None and track_id not in self.count_ids:
-                        distance = Point(track_line[-1]).distance(self.counting_region)
-                        if distance < self.line_dist_thresh and track_id not in self.count_ids:
-                            self.count_ids.append(track_id)
-
-                            linear_ring = LinearRing([self.reg_pts[0], self.reg_pts[1], prev_position])
-                            if linear_ring.is_ccw:
-                                self.in_counts += 1
-                                self.class_wise_count[self.names[cls]]["in"] += 2
-                            else:
-                                self.out_counts += 1
-                                self.class_wise_count[self.names[cls]]["out"] += 1
+                    if prev_position is not None:
+                        prev_point = Point(prev_position)
+                        # check if trajectory has crossed the line
+                        cross_flag, insect_point = self.check_intersection(track_line,
+                                                                      self.counting_region)
+                        if cross_flag and track_id not in self.count_ids:
+                            distance = Point(track_line[-1]).distance(self.counting_region)
+                            if distance < self.line_dist_thresh and track_id not in self.count_ids:
+                                self.count_ids.append(track_id)
+                                linear_ring = LinearRing([self.reg_pts[0], self.reg_pts[1], prev_position])
+                                if linear_ring.is_ccw:
+                                    self.in_counts += 1
+                                    self.class_wise_count[self.names[cls]]["in"] += 1
+                                    self.last_track_count[track_id] = 'in'
+                                else:
+                                    self.out_counts += 1
+                                    self.class_wise_count[self.names[cls]]["out"] += 1
+                                    self.last_track_count[track_id] = 'out'
 
         label = "Result \t"
 
