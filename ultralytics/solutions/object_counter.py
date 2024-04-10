@@ -211,8 +211,10 @@ class ObjectCounter:
 
                     if prev_position is not None and is_inside and track_id not in self.count_ids:
                         self.count_ids.append(track_id)
-
-                        if (box[0] - prev_position[0]) * (self.counting_region.centroid.x - prev_position[0]) > 0:
+                        
+                        linear_ring = LinearRing([self.reg_pts[0], self.reg_pts[1], prev_position])
+                        
+                        if linear_ring.is_ccw:
                             self.in_counts += 1
                             self.class_wise_count[self.names[cls]]["in"] += 1
                             self.last_track_count[track_id] = 'in'
